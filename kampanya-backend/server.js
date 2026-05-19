@@ -37,7 +37,7 @@ const authenticateToken = (req, res, next) => {
 
   if (!token) return res.status(401).json({ success: false, message: 'Erişim reddedildi! Biletin yok.' });
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
     if (err) return res.status(403).json({ success: false, message: 'Geçersiz veya süresi dolmuş bilet!' });
     req.user = user; // Bilet onaylandı, kullanıcının kimliğini (ID) isteğin içine koy
     next(); // Kapıyı aç, devam etmesine izin ver
