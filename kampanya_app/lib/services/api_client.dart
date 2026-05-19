@@ -1,10 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
+import 'package:kampanya_app/config.dart';
+import 'package:kampanya_app/screens/login_screen.dart';
+import 'package:flutter/material.dart';
 
 class ApiClient {
   static final Dio dio = Dio(BaseOptions(
-    baseUrl: 'http://10.245.24.131:3000', // Ana adresimiz
+    baseUrl: AppConfig.baseUrl,
     connectTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 5),
   ));
@@ -34,7 +37,7 @@ class ApiClient {
             try {
               // Görevliye çaktırmadan VIP kartı verip yeni bilet iste
               final refreshResponse = await Dio().post(
-                'http://10.245.24.131:3000/api/refresh',
+                '${AppConfig.baseUrl}/api/refresh',
                 data: {'refreshToken': refreshToken},
               );
               
@@ -49,10 +52,13 @@ class ApiClient {
               return handler.resolve(retryResponse); // İşlem başarılı, yola devam!
               
             } catch (refreshError) {
-              // Eğer VIP kartın da süresi bitmişse (7 gün geçmişse) her şeyi sil ve dışarı at!
+              // Eğer VIP kartın da süresi bitmişse her şeyi sil ve dışarı at!
               await secureStorage.deleteAll();
-              Get.offAllNamed('/login'); 
-              Get.snackbar('Oturum Kapandı', 'Lütfen tekrar giriş yapın.');
+              
+              // İSİM YERİNE DOĞRUDAN SAYFAYA YÖNLENDİRİYORUZ!
+              Get.offAll(() => const LoginScreen()); 
+              
+              Get.snackbar('Oturum Kapandı', 'Lütfen tekrar giriş yapın.', backgroundColor: Colors.orange, colorText: Colors.white);
             }
           }
         }

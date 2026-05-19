@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:dio/dio.dart';
+import 'package:kampanya_app/config.dart';
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -30,7 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         receiveTimeout: const Duration(seconds: 5),
       ));
       
-      final String backendUrl = 'http://10.245.24.131:3000'; // IP Adresin
+      final String backendUrl = AppConfig.baseUrl;
 
       final response = await dio.post(
         '$backendUrl/api/register',
@@ -42,8 +44,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       if (response.statusCode == 200) {
-        Get.snackbar('Başarılı', 'Kayıt tamam! Şimdi giriş yapabilirsiniz.', backgroundColor: Colors.green, colorText: Colors.white);
-        Get.back(); // Giriş ekranına geri dön
+        Get.snackbar(
+          'Başarılı', 
+          'Kayıt başarıyla tamamlandı! Giriş yapabilirsiniz.', 
+          backgroundColor: Colors.green, 
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3)
+        );
+
+        // Textbox'ları temizle
+        phoneController.clear();
+        passwordController.clear();
+        nameController.clear();
+
+        // KESİN ÇÖZÜM: 2 saniye bekleyip Giriş Ekranına sıfırlayarak fırlatıyoruz
+        Future.delayed(const Duration(seconds: 2), () {
+          Get.offAll(() => const LoginScreen());
+        });
       }
     } on DioException catch (e) {
       // Node.js'ten gelen X-Ray (Joi) hata mesajını paketin içinden çıkar!

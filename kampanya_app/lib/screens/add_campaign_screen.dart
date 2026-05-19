@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:dio/dio.dart';
 import 'home_screen.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:kampanya_app/services/api_client.dart'; // Ajanı çağırdık
 
 class AddCampaignScreen extends StatefulWidget {
   const AddCampaignScreen({Key? key}) : super(key: key);
@@ -14,9 +14,7 @@ class AddCampaignScreen extends StatefulWidget {
 
 class _AddCampaignScreenState extends State<AddCampaignScreen> {
   final _formKey = GlobalKey<FormState>();
-  final storage = GetStorage();
   bool isLoading = false;
-  final secureStorage = const FlutterSecureStorage();
 
   // Text Controller'lar
   final titleController = TextEditingController();
@@ -29,11 +27,9 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
   String? selectedCity;
   DateTime? selectedDate;
 
-  // Sabit Listeler
   final List<String> categories = ['Kahveci', 'Yemek', 'Hizmet', 'Giyim', 'Market'];
   final List<String> cities = ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Siirt'];
 
-  // TARİH SEÇİCİ (Takvim)
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -44,7 +40,7 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFFFF7A00), // Takvim Turuncu Tema
+              primary: Color(0xFFFF7A00),
               onPrimary: Colors.white,
               onSurface: Colors.black,
             ),
@@ -53,14 +49,10 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
         );
       },
     );
-    if (picked != null && picked != selectedDate) {
-      setState(() {
-        selectedDate = picked;
-      });
-    }
+    if (picked != null) setState(() => selectedDate = picked);
   }
 
-  // VERİTABANINA KAYIT FONKSİYONU
+  // GÜVENLİ KAYIT FONKSİYONU
   void _submitCampaign() async {
     if (!_formKey.currentState!.validate() || selectedCategory == null || selectedCity == null || selectedDate == null) {
       Get.snackbar('Eksik Bilgi', 'Lütfen tüm alanları doldurun.', backgroundColor: Colors.redAccent, colorText: Colors.white);
@@ -70,16 +62,11 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
     setState(() => isLoading = true);
 
     try {
-      final dio = Dio();
-      final String backendUrl = 'http://10.245.24.131:3000'; // IP adresini kontrol et
-      
-      // HAFIZADAKİ BİLETİ (TOKEN) AL
-      final String? token = await secureStorage.read(key: 'token'); 
-
-      final response = await dio.post(
-        '$backendUrl/api/campaigns',
+      // DİKKAT: Manuel Dio ve Token okuma bitti! 
+      // Ajan (ApiClient.dio) bileti otomatik olarak kasadan alıp başlığa takacak.
+      final response = await ApiClient.dio.post(
+        '/api/campaigns',
         data: {
-          // user_id'yi sildik, çünkü backend bunu token'dan kendisi bulacak!
           'title': titleController.text,
           'description': descriptionController.text,
           'category': selectedCategory,
@@ -88,22 +75,20 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
           'address': addressController.text,
           'end_date': selectedDate!.toIso8601String(),
         },
-        // BİLETİ GÜVENLİK GÖREVLİSİNE (BACKEND) GÖSTER
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
       );
 
       if (response.statusCode == 200) {
         Get.snackbar('Başarılı!', 'Kampanyanız yayına alındı 🚀', backgroundColor: Colors.green, colorText: Colors.white);
-        Get.offAll(() => const HomeScreen());
+        Get.offAll(() => const HomeScreen()); // Listeyi yenilemek için Home'a dön
       }
+    } on DioException catch (e) {
+      // Ajan hatayı yakaladıysa detayını gösterelim
+      String errMsg = e.response?.data?['error'] ?? 'Kampanya eklenemedi!';
+      Get.snackbar('Hata', errMsg, backgroundColor: Colors.redAccent, colorText: Colors.white);
     } catch (e) {
-      Get.snackbar('Yetki Hatası', 'Oturumunuzun süresi dolmuş olabilir. Tekrar giriş yapın.', backgroundColor: Colors.redAccent, colorText: Colors.white);
+      Get.snackbar('Hata', 'Beklenmedik bir hata oluştu.', backgroundColor: Colors.redAccent, colorText: Colors.white);
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -112,9 +97,13 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Yeni Kampanya Oluştur', style: TextStyle(color: Colors.white)),
+        // KENDİ ELLERİMİZLE GERİ TUŞU EKLİYORUZ
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Get.offAll(() => const HomeScreen()), // Geri tuşu Home'a döndürür
+        ),
+        title: const Text('Yeni Kampanya Oluştur', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFFFF7A00),
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -123,15 +112,12 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Başlık
               TextFormField(
                 controller: titleController,
-                decoration: const InputDecoration(labelText: 'Kampanya Başlığı (Örn: Çaylar Müesseseden!)', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Kampanya Başlığı', border: OutlineInputBorder()),
                 validator: (val) => val!.isEmpty ? 'Başlık zorunludur' : null,
               ),
               const SizedBox(height: 16),
-
-              // Açıklama
               TextFormField(
                 controller: descriptionController,
                 maxLines: 3,
@@ -139,15 +125,13 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
                 validator: (val) => val!.isEmpty ? 'Açıklama zorunludur' : null,
               ),
               const SizedBox(height: 16),
-
-              // Kategori & Şehir Yan Yana
               Row(
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       decoration: const InputDecoration(labelText: 'Kategori', border: OutlineInputBorder()),
                       value: selectedCategory,
-                      items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
                       onChanged: (val) => setState(() => selectedCategory = val),
                     ),
                   ),
@@ -156,23 +140,19 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
                     child: DropdownButtonFormField<String>(
                       decoration: const InputDecoration(labelText: 'Şehir', border: OutlineInputBorder()),
                       value: selectedCity,
-                      items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
                       onChanged: (val) => setState(() => selectedCity = val),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-
-              // İlçe
               TextFormField(
                 controller: districtController,
-                decoration: const InputDecoration(labelText: 'İlçe (Örn: Kadıköy)', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'İlçe', border: OutlineInputBorder()),
                 validator: (val) => val!.isEmpty ? 'İlçe zorunludur' : null,
               ),
               const SizedBox(height: 16),
-
-              // Tam Adres
               TextFormField(
                 controller: addressController,
                 maxLines: 2,
@@ -180,8 +160,6 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
                 validator: (val) => val!.isEmpty ? 'Adres zorunludur' : null,
               ),
               const SizedBox(height: 24),
-
-              // Bitiş Tarihi Seçici
               OutlinedButton.icon(
                 onPressed: () => _selectDate(context),
                 icon: const Icon(Icons.calendar_today, color: Color(0xFFFF7A00)),
@@ -197,8 +175,6 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-
-              // YAYINLA BUTONU
               SizedBox(
                 height: 55,
                 child: ElevatedButton(

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:dio/dio.dart'; // İŞTE EKSİK OLAN HAYAT KURTARICI KOD BURADA!
+import 'package:kampanya_app/services/api_client.dart';
+import 'package:kampanya_app/config.dart';
+import 'login_screen.dart';
 import 'add_campaign_screen.dart';
-import 'package:kampanya_app/services/api_client.dart';
-import 'package:kampanya_app/services/api_client.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -15,9 +17,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final storage = GetStorage();
+  final secureStorage = const FlutterSecureStorage(); 
+  
   bool isMerchant = false;
   String userName = '';
-
   List<dynamic> campaigns = [];
   bool isLoading = true;
 
@@ -25,36 +28,30 @@ class _HomeScreenState extends State<HomeScreen> {
   String? selectedCity;
   String? selectedCategory;
 
-  // Örnek Kategori ve Şehir Listeleri (MVP için sabit)
+  // Örnek Kategori ve Şehir Listeleri
   final List<String> categories = ['Tümü', 'Kahveci', 'Yemek', 'Hizmet', 'Giyim', 'Market'];
-  final List<String> cities = ['Tümü', 'İstanbul', 'Ankara', 'İzmir', 'Bursa'];
+  final List<String> cities = ['Tümü', 'İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Siirt']; // Siirt'i buraya da ekledim :)
 
   @override
   void initState() {
     super.initState();
-    // Giriş yapanın kimliğini hafızadan al
     isMerchant = storage.read('isMerchant') ?? false;
     userName = storage.read('userName') ?? 'Misafir';
-    
-    // Kampanyaları API'den çek
     _fetchCampaigns();
   }
 
   Future<void> _fetchCampaigns() async {
     setState(() => isLoading = true);
     try {
-      // 1. Filtre parametrelerini hazırla
       Map<String, dynamic> queryParams = {};
       if (selectedCity != null && selectedCity != 'Tümü') queryParams['city'] = selectedCity;
       if (selectedCategory != null && selectedCategory != 'Tümü') queryParams['category'] = selectedCategory;
 
-      // 2. Ajanı göreve gönder (Adresi kendi biliyor, sadece rotayı ve filtreleri ver!)
       final response = await ApiClient.dio.get(
-        '/api/campaigns', 
+        '${AppConfig.baseUrl}/api/campaigns', 
         queryParameters: queryParams
       );
       
-      // 3. Gelen veriyi ekrana bas
       if (response.statusCode == 200) {
         setState(() {
           campaigns = response.data;
@@ -62,10 +59,48 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print("KAMPANYA ÇEKME HATASI: $e");
-      // İstersen buraya Get.snackbar ile "Veriler yüklenemedi" uyarısı da koyabilirsin.
-    }finally {
-      setState(() => isLoading = false);
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  // KAMPANYA SİLME FONKSİYONU
+  void _deleteCampaign(int campaignId) async {
+    Get.defaultDialog(
+      title: 'Kampanyayı Sil',
+      middleText: 'Bu kampanyayı silmek istediğinize emin misiniz?',
+      textCancel: 'İptal',
+      textConfirm: 'Evet, Sil',
+      confirmTextColor: Colors.white,
+      buttonColor: Colors.redAccent,
+      cancelTextColor: Colors.black,
+      onConfirm: () async {
+        Get.back(); // Dialogu kapat
+        try {
+          // Ajanı (ApiClient) göreve yolla
+          final response = await ApiClient.dio.delete('/api/campaigns/$campaignId');
+          if (response.statusCode == 200) {
+            Get.snackbar('Başarılı', 'Kampanya silindi.', backgroundColor: Colors.green, colorText: Colors.white);
+            _fetchCampaigns(); // Listeyi güncelle
+          }
+        } on DioException catch (e) {
+          // EĞER BAŞKASININ KAMPANYASINI SİLMEYE ÇALIŞIRSA BACKEND BURAYA HATA FIRLATIR!
+          String errMsg = e.response?.data?['message'] ?? 'Silinemedi.';
+          Get.snackbar('Güvenlik Duvarı 🛡️', errMsg, backgroundColor: Colors.redAccent, colorText: Colors.white);
+        }
+      }
+    );
+  }
+
+  // GÜVENLİ ÇIKIŞ FONKSİYONU
+  void _logout() async {
+    await secureStorage.deleteAll();
+    storage.write('isMerchant', false);
+    storage.remove('merchantPhone');
+    Get.offAll(() => const LoginScreen());
+    
+    Get.snackbar('Çıkış Başarılı', 'Güvenli bir şekilde çıkış yaptınız.', 
+        backgroundColor: Colors.blueGrey, colorText: Colors.white);
   }
 
   @override
@@ -76,26 +111,28 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Kampanya Avcısı', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-            Text('Hoş geldin, $userName', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal)),
+            const Text('Kampanya Avcısı', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white)),
+            Text('Hoş geldin, $userName', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal, color: Colors.white70)),
           ],
         ),
         backgroundColor: const Color(0xFFFF7A00),
-        foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.exit_to_app),
-            onPressed: () {
-              storage.erase(); // Çıkış yap ve hafızayı temizle
-              Get.offAllNamed('/'); // Login ekranına dön (Route ayarına göre değiştir)
-            },
-          )
+          if (isMerchant)
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.white),
+              onPressed: _logout,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.login, color: Colors.white),
+              onPressed: () => Get.offAll(() => const LoginScreen()),
+            )
         ],
       ),
       body: Column(
         children: [
-          // FİLTRELEME ÇUBUĞU (Senin istediğin akıllı filtre mantığı)
+          // FİLTRELEME ÇUBUĞU
           Container(
             color: Colors.white,
             padding: const EdgeInsets.all(12.0),
@@ -112,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                     onChanged: (val) {
                       setState(() => selectedCity = val);
-                      _fetchCampaigns(); // Seçim değişince API'ye tekrar istek at
+                      _fetchCampaigns(); 
                     },
                   ),
                 ),
@@ -128,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                     onChanged: (val) {
                       setState(() => selectedCategory = val);
-                      _fetchCampaigns(); // Seçim değişince API'ye tekrar istek at
+                      _fetchCampaigns(); 
                     },
                   ),
                 ),
@@ -167,10 +204,25 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  Text(
-                                    camp['title'] ?? 'Başlıksız',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  
+                                  // BAŞLIK VE SİL BUTONU SATIRI
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          camp['title'] ?? 'Başlıksız',
+                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      if (isMerchant)
+                                        IconButton(
+                                          icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                          onPressed: () => _deleteCampaign(camp['id']),
+                                        ),
+                                    ],
                                   ),
+                                  
                                   const SizedBox(height: 8),
                                   Text(
                                     camp['description'] ?? '',
@@ -194,18 +246,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       
-      // ESNAF İÇİN "KAMPANYA EKLE" BUTONU (Senin Stratejin)
+      // ESNAF İÇİN "KAMPANYA EKLE" BUTONU
       floatingActionButton: isMerchant
           ? FloatingActionButton.extended(
               onPressed: () {
-                Get.to(() => const AddCampaignScreen());
+                // Get.offAll YERİNE Get.to KULLANIYORUZ Kİ GERİ TUŞU ÇALIŞSIN!
+                Get.to(() => const AddCampaignScreen()); 
               },
               backgroundColor: const Color(0xFFFF7A00),
               icon: const Icon(Icons.add, color: Colors.white),
               label: const Text('Kampanya Ekle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             )
-          : null, // Misafir girerse buton yok (null)
+          : null,
     );
   }
 }
-

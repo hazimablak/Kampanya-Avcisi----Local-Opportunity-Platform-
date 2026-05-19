@@ -126,7 +126,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 // 3. KAMPANYALARI GETİR (Herkes görebilir, bilet gerekmez)
 app.get('/api/campaigns', async (req, res) => {
   const { city, district, category } = req.query;
-  let query = 'SELECT * FROM campaigns WHERE 1=1';
+  let query = 'SELECT * FROM campaigns WHERE end_date >= CURRENT_DATE';
   let values = [];
   let counter = 1;
 

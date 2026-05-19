@@ -7,7 +7,7 @@ import 'package:kampanya_app/services/api_client.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Flutter motorunu hazırla
   
-  await GetStorage.init(); // Hafıza kutusunu (GetStorage) başlat! (Çökme burdan oluyordu)
+  await GetStorage.init(); // Hafıza kutusunu (GetStorage) başlat! 
   ApiClient.setup(); // API istemcisini başlat
 
   runApp(const KampanyaApp());
