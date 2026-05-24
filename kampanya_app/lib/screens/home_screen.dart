@@ -184,6 +184,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemCount: campaigns.length,
                         itemBuilder: (context, index) {
                           final camp = campaigns[index];
+                          
+                          // KİMLİK KONTROLLERİNİ BURAYA (ARAYÜZ ÇİZİLMEDEN ÖNCEYE) ALDIK!
+                          String myPhone = storage.read('merchantPhone') ?? '';
+                          String adminPhone = '5303611650'; // Kendi numaranı buraya yaz
+                          bool isAdmin = myPhone == adminPhone;
+                          bool isMyCampaign = camp['merchant_phone'] == myPhone;
+
                           return Card(
                             elevation: 4,
                             margin: const EdgeInsets.only(bottom: 16),
@@ -205,13 +212,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   
-                                  // KİMLİK KONTROLLERİ
-                                  String myPhone = storage.read('merchantPhone') ?? '';
-                                  String adminPhone = '5303611650'; 
-
-                                  bool isAdmin = myPhone == adminPhone;
-                                  bool isMyCampaign = camp['merchant_phone'] == myPhone;
-
                                   // BAŞLIK VE SİL BUTONU SATIRI
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -222,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                         ),
                                       ),
-                                      // ÇÖP KUTUSUNU SADECE KAMPANYA SAHİBİ VEYA ADMİN GÖREBİLİR!
+                                      // SADECE ADMİN VEYA KAMPANYA SAHİBİ ÇÖP KUTUSUNU GÖRÜR
                                       if (isAdmin || isMyCampaign)
                                         IconButton(
                                           icon: const Icon(Icons.delete, color: Colors.redAccent),

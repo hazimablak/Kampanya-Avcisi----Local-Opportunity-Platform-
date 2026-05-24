@@ -1,8 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
-const bcrypt = require('bcrypt'); // Şifre kriptolayıcı
-const jwt = require('jsonwebtoken'); // Dijital Biletçi
+const bcrypt = require('bcrypt'); 
+const jwt = require('jsonwebtoken'); 
 require('dotenv').config();
 const Joi = require('joi');
 const rateLimit = require('express-rate-limit');
@@ -10,6 +10,9 @@ const app = express();
 require('dotenv').config();
 app.use(cors());
 app.use(express.json());
+const cors = require('cors'); 
+const app = express();
+app.use(cors());
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
   max: 5, // Aynı IP'den 15 dakika içinde en fazla 5 deneme izni
@@ -127,12 +130,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 app.get('/api/campaigns', async (req, res) => {
   const { city, district, category } = req.query;
   // Kampanyalar ile Kullanıcılar tablosunu (JOIN ile) birleştiriyoruz ki telefon numarasını da alalım!
-let query = `
-  SELECT c.*, u.phone AS merchant_phone 
-  FROM campaigns c 
-  INNER JOIN users u ON c.user_id = u.id 
-  WHERE c.end_date >= CURRENT_DATE
-`;
+  let query = `SELECT c.*, u.phone AS merchant_phone FROM campaigns c INNER JOIN users u ON c.user_id = u.id WHERE c.end_date >= CURRENT_DATE`;
   let values = [];
   let counter = 1;
 
