@@ -126,7 +126,13 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 // 3. KAMPANYALARI GETİR (Herkes görebilir, bilet gerekmez)
 app.get('/api/campaigns', async (req, res) => {
   const { city, district, category } = req.query;
-  let query = 'SELECT * FROM campaigns WHERE end_date >= CURRENT_DATE';
+  // Kampanyalar ile Kullanıcılar tablosunu (JOIN ile) birleştiriyoruz ki telefon numarasını da alalım!
+let query = `
+  SELECT c.*, u.phone AS merchant_phone 
+  FROM campaigns c 
+  INNER JOIN users u ON c.user_id = u.id 
+  WHERE c.end_date >= CURRENT_DATE
+`;
   let values = [];
   let counter = 1;
 

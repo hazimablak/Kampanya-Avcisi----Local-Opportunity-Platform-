@@ -205,6 +205,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   
+                                  // KİMLİK KONTROLLERİ
+                                  String myPhone = storage.read('merchantPhone') ?? '';
+                                  String adminPhone = '5303611650'; 
+
+                                  bool isAdmin = myPhone == adminPhone;
+                                  bool isMyCampaign = camp['merchant_phone'] == myPhone;
+
                                   // BAŞLIK VE SİL BUTONU SATIRI
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -215,7 +222,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                         ),
                                       ),
-                                      if (isMerchant)
+                                      // ÇÖP KUTUSUNU SADECE KAMPANYA SAHİBİ VEYA ADMİN GÖREBİLİR!
+                                      if (isAdmin || isMyCampaign)
                                         IconButton(
                                           icon: const Icon(Icons.delete, color: Colors.redAccent),
                                           onPressed: () => _deleteCampaign(camp['id']),
