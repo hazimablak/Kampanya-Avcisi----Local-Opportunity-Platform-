@@ -7,29 +7,27 @@ export default function Login({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // KENDİ NUMARANI BURAYA YAZ (Sadece bu numara admin paneline girebilir!)
-  const ADMIN_PHONE = '05551234567'; 
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // 1. Önce sadece Admin numarası mı diye kontrol edelim
-    if (phone !== ADMIN_PHONE) {
-      setError('Yetkisiz Giriş! Bu panele sadece Sistem Yöneticisi girebilir.');
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // 2. Node.js'e gidip şifreyi soruyoruz
+      // Backend'e gidip şifreyi soruyoruz
       const response = await api.post('/api/login', { phone, password });
       
       if (response.status === 200) {
-        // 3. Giriş başarılıysa bileti (Token) tarayıcının kasasına sakla
+        
+        // Backend'den dönen veride isAdmin: true yazmıyorsa, yetkisizdir!
+        if (!response.data.isAdmin) {
+          setError('Yetkisiz Giriş! Bu panele sadece Sistem Yöneticisi girebilir.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Eğer admin ise bileti sakla ve paneli aç
         localStorage.setItem('adminToken', response.data.accessToken);
-        onLoginSuccess(); // App.jsx'e "Giriş yapıldı, paneli aç" mesajı yolla
+        onLoginSuccess();
       }
     } catch (err) {
       setError('Giriş başarısız! Numara veya şifre hatalı.');
@@ -82,7 +80,6 @@ export default function Login({ onLoginSuccess }) {
   );
 }
 
-// Şimdilik hızlıca şık görünmesi için basit React CSS objeleri (Tailwind kurmadan direkt çalışır)
 const styles = {
   container: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f3f4f6' },
   card: { backgroundColor: 'white', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' },
