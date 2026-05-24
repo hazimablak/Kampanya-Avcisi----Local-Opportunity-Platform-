@@ -74,7 +74,8 @@ class _LoginScreenState extends State<LoginScreen> {
         
         storage.write('isMerchant', true); 
         storage.write('merchantPhone', phoneController.text);
-        
+        storage.write('isAdmin', response.data['isAdmin']);
+
         // Ana sayfaya geçiş
         Future.delayed(const Duration(seconds: 1), () {
           Get.offAll(() => const HomeScreen());

@@ -187,8 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           
                           // KİMLİK KONTROLLERİNİ BURAYA (ARAYÜZ ÇİZİLMEDEN ÖNCEYE) ALDIK!
                           String myPhone = storage.read('merchantPhone') ?? '';
-                          String adminPhone = AppConfig.adminPhone;
-                          bool isAdmin = myPhone == adminPhone;
+                          bool isAdmin = storage.read('isAdmin') ?? false; 
                           bool isMyCampaign = camp['merchant_phone'] == myPhone;
 
                           return Card(

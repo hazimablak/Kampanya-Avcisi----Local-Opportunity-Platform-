@@ -181,6 +181,22 @@ app.post('/api/refresh', (req, res) => {
   });
 });
 
+// 7. TÜM ESNAFLARI GETİR (SADECE ADMİN GÖREBİLİR)
+app.get('/api/users', authenticateToken, async (req, res) => {
+  // 1. Ekstra Güvenlik: Giren kişi admin değilse kapıyı yüzüne kapat!
+  if (!req.user.isAdmin) {
+    return res.status(403).json({ error: 'Bu veriyi sadece Sistem Yöneticisi görebilir!' });
+  }
+  
+  try {
+    // 2. Şifreleri ASLA çekmiyoruz! Sadece id, isim ve telefon numarasını alıyoruz.
+    const result = await pool.query('SELECT id, name, phone FROM users ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Kullanıcılar çekilemedi' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Sunucu ${PORT} portunda çalışıyor!`);

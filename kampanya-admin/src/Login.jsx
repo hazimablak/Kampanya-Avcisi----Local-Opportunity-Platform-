@@ -6,6 +6,9 @@ export default function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // 1. YENİ DURUM: Şifre görünür mü, gizli mi?
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -13,19 +16,15 @@ export default function Login({ onLoginSuccess }) {
     setIsLoading(true);
 
     try {
-      // Backend'e gidip şifreyi soruyoruz
       const response = await api.post('/api/login', { phone, password });
       
       if (response.status === 200) {
-        
-        // Backend'den dönen veride isAdmin: true yazmıyorsa, yetkisizdir!
         if (!response.data.isAdmin) {
           setError('Yetkisiz Giriş! Bu panele sadece Sistem Yöneticisi girebilir.');
           setIsLoading(false);
           return;
         }
 
-        // Eğer admin ise bileti sakla ve paneli aç
         localStorage.setItem('adminToken', response.data.accessToken);
         onLoginSuccess();
       }
@@ -54,21 +53,32 @@ export default function Login({ onLoginSuccess }) {
               value={phone} 
               onChange={(e) => setPhone(e.target.value)} 
               style={styles.input} 
-              placeholder="Örn: 5551234567"
+              placeholder="Örn: 05551234567"
               required 
             />
           </div>
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>Admin Şifresi</label>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              style={styles.input} 
-              placeholder="••••••••"
-              required 
-            />
+            {/* 2. ŞİFRE KUTUSUNU YENİDEN DÜZENLEDİK */}
+            <div style={{ display: 'flex', position: 'relative' }}>
+              <input 
+                type={showPassword ? "text" : "password"} // Göz açıksa text, kapalıysa password
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                style={{ ...styles.input, width: '100%', paddingRight: '40px' }} 
+                placeholder="••••••••"
+                required 
+              />
+              {/* 3. GÖZ İKONU BUTONU */}
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
 
           <button type="submit" style={styles.button} disabled={isLoading}>
@@ -80,6 +90,7 @@ export default function Login({ onLoginSuccess }) {
   );
 }
 
+// CSS stilleri aynı kalıyor...
 const styles = {
   container: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f3f4f6' },
   card: { backgroundColor: 'white', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' },
@@ -90,6 +101,6 @@ const styles = {
   form: { display: 'flex', flexDirection: 'column', gap: '20px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
   label: { fontSize: '14px', color: '#374151', fontWeight: 'bold' },
-  input: { padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '16px', outline: 'none' },
+  input: { padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '16px', outline: 'none', boxSizing: 'border-box' },
   button: { backgroundColor: '#FF7A00', color: 'white', padding: '14px', borderRadius: '8px', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }
 };
