@@ -157,40 +157,57 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
                   // KATEGORİ
                   Expanded(
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD
                       decoration: const InputDecoration(labelText: 'Kategori', border: OutlineInputBorder()),
                       value: selectedCategory,
-                      items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
+                      items: categories.map((c) => DropdownMenuItem(
+                        value: c, 
+                        child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)
+                      )).toList(),
                       onChanged: (val) => setState(() => selectedCategory = val),
                     ),
                   ),
                   const SizedBox(width: 16),
-                  // DİNAMİK İL SEÇİM KUTUSU
+                  // AKILLI İL KUTUSU
                   Expanded(
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD
                       decoration: const InputDecoration(labelText: 'İl', border: OutlineInputBorder()),
                       value: selectedCity,
                       items: cities.map((c) => DropdownMenuItem(
                         value: c, 
-                        child: Text(c, style: const TextStyle(fontSize: 14))
+                        child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)
                       )).toList(),
                       onChanged: (val) {
                         if (val == null) return;
                         setState(() {
                           selectedCity = val;
-                          selectedDistrict = null; // İl değişince ilçeyi sıfırla!
+                          selectedDistrict = null; 
                           
-                          // SİHİRLİ FİLTRELEME: Büyük listeden sadece sehir_adi seçilen il olanları süzüyoruz
                           currentDistricts = allDistrictsRaw
                               .where((item) => item['sehir_adi'].toString() == val)
                               .map((item) => item['ilce_adi'].toString())
                               .toList();
                           
-                          currentDistricts.sort(); // İlçeleri de kendi içinde alfabetik sırala
+                          currentDistricts.sort(); 
                         });
                       },
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              // AKILLI İLÇE KUTUSU
+              DropdownButtonFormField<String>(
+                isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD
+                decoration: const InputDecoration(labelText: 'İlçe', border: OutlineInputBorder()),
+                value: selectedDistrict,
+                items: currentDistricts.map((d) => DropdownMenuItem(
+                  value: d, 
+                  child: Text(d, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)
+                )).toList(),
+                onChanged: (val) => setState(() => selectedDistrict = val),
+                disabledHint: const Text('Önce İl Seçiniz'),
               ),
               const SizedBox(height: 16),
               // AKILLI İLÇE KUTUSU

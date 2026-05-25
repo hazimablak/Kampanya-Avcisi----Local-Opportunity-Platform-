@@ -122,48 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
     Get.snackbar('Çıkış Başarılı', 'Güvenli bir şekilde çıkış yaptınız.', backgroundColor: Colors.blueGrey, colorText: Colors.white);
   }
 
-  // YATAY KAYDIRILABİLİR "HAP" (PILL) BUTON TASARIMI
-  Widget _buildChipRow(List<String> items, String selectedValue, Function(String) onSelected) {
-    return SizedBox(
-      height: 42,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-          final isSelected = item == selectedValue;
-          return Padding(
-            padding: const EdgeInsets.only(right: 10.0),
-            child: ChoiceChip(
-              label: Text(
-                item, 
-                style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF4B5563),
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                )
-              ),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) onSelected(item);
-              },
-              selectedColor: const Color(0xFFFF7A00),
-              backgroundColor: Colors.white,
-              showCheckmark: false,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: isSelected ? const Color(0xFFFF7A00) : Colors.grey.shade300, width: 1.5),
-              ),
-              elevation: isSelected ? 3 : 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -187,56 +145,96 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // YENİ KAYDIRILABİLİR FİLTRELEME ALANI
+          // ESKİ VE KULLANIŞLI DROPDOWN FİLTRELEME ÇUBUĞU
           Container(
-            padding: const EdgeInsets.only(top: 16, bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                )
-              ]
-            ),
+            color: Colors.white,
+            padding: const EdgeInsets.all(12.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildChipRow(categories, selectedCategory ?? 'Tümü', (val) {
-                  setState(() => selectedCategory = val);
-                  _fetchCampaigns();
-                }),
-                const SizedBox(height: 12),
-                _buildChipRow(cities, selectedCity ?? 'Tümü', (val) {
-                  setState(() {
-                    selectedCity = val;
-                    selectedDistrict = 'Tümü'; 
-                    if (val == 'Tümü' || val == null) {
-                      currentDistricts = ['Tümü'];
-                    } else {
-                      List<String> dists = allDistrictsRaw
-                          .where((item) => item['sehir_adi'].toString() == val)
-                          .map((item) => item['ilce_adi'].toString())
-                          .toList();
-                      dists.sort();
-                      currentDistricts = ['Tümü', ...dists];
-                    }
-                    _fetchCampaigns(); 
-                  });
-                }),
-                if (selectedCity != null && selectedCity != 'Tümü') ...[
-                  const SizedBox(height: 12),
-                  _buildChipRow(currentDistricts, selectedDistrict ?? 'Tümü', (val) {
-                    setState(() => selectedDistrict = val);
-                    _fetchCampaigns();
-                  }),
-                ]
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD 1
+                        decoration: const InputDecoration(
+                          labelText: 'Kategori',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                          border: OutlineInputBorder(),
+                        ),
+                        value: selectedCategory,
+                        items: categories.map((c) => DropdownMenuItem(
+                          value: c, 
+                          child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis) // ÜÇ NOKTA KOYAN KOD
+                        )).toList(),
+                        onChanged: (val) {
+                          setState(() => selectedCategory = val);
+                          _fetchCampaigns(); 
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD 1
+                        decoration: const InputDecoration(
+                          labelText: 'Şehir',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                          border: OutlineInputBorder(),
+                        ),
+                        value: selectedCity,
+                        items: cities.map((c) => DropdownMenuItem(
+                          value: c, 
+                          child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis) // ÜÇ NOKTA KOYAN KOD
+                        )).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            selectedCity = val;
+                            selectedDistrict = 'Tümü'; 
+                            
+                            if (val == 'Tümü' || val == null) {
+                              currentDistricts = ['Tümü'];
+                            } else {
+                              List<String> dists = allDistrictsRaw
+                                  .where((item) => item['sehir_adi'].toString() == val)
+                                  .map((item) => item['ilce_adi'].toString())
+                                  .toList();
+                              dists.sort();
+                              currentDistricts = ['Tümü', ...dists];
+                            }
+                            _fetchCampaigns(); 
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                // İLÇE FİLTRESİ
+                if (selectedCity != null && selectedCity != 'Tümü')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12.0),
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD
+                      decoration: const InputDecoration(
+                        labelText: 'İlçe',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                        border: OutlineInputBorder(),
+                      ),
+                      value: selectedDistrict,
+                      items: currentDistricts.map((c) => DropdownMenuItem(
+                        value: c, 
+                        child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)
+                      )).toList(),
+                      onChanged: (val) {
+                        setState(() => selectedDistrict = val);
+                        _fetchCampaigns(); 
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
 
-          // MODERN KAMPANYA LİSTESİ
+          // MODERN KAMPANYA LİSTESİ (KARTLAR)
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF7A00)))
