@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart'; 
+import 'package:shimmer/shimmer.dart'; // SHIMMER PAKETİ EKLENDİ!
 import 'package:kampanya_app/services/api_client.dart';
 import 'package:kampanya_app/config.dart';
 import 'login_screen.dart';
@@ -26,7 +27,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> campaigns = [];
   bool isLoading = true;
 
-  // Filtre Değişkenleri
   String? selectedCity = 'Tümü';
   String? selectedDistrict = 'Tümü';
   String? selectedCategory = 'Tümü';
@@ -122,6 +122,95 @@ class _HomeScreenState extends State<HomeScreen> {
     Get.snackbar('Çıkış Başarılı', 'Güvenli bir şekilde çıkış yaptınız.', backgroundColor: Colors.blueGrey, colorText: Colors.white);
   }
 
+  // --- HARİKA YÜKLEME ANİMASYONU (SHIMMER) ---
+  Widget _buildShimmerLoading() {
+    return ListView.builder(
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 20, bottom: 100),
+      itemCount: 4, // Yüklenirken 4 tane sahte iskelet kart göster
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade100),
+          ),
+          child: Shimmer.fromColors(
+            baseColor: Colors.grey.shade200,
+            highlightColor: Colors.grey.shade50,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(width: 100, height: 24, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
+                    Container(width: 60, height: 24, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(width: double.infinity, height: 20, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+                const SizedBox(height: 8),
+                Container(width: 150, height: 16, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12.0),
+                  child: Divider(color: Colors.white, thickness: 1.5),
+                ),
+                Container(width: 200, height: 16, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- HARİKA BOŞ EKRAN (EMPTY STATE) TASARIMI ---
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(color: const Color(0xFFFF7A00).withOpacity(0.1), shape: BoxShape.circle),
+              child: const Icon(Icons.travel_explore_rounded, size: 80, color: Color(0xFFFF7A00)),
+            ),
+            const SizedBox(height: 24),
+            const Text('Buralar Çok Issız...', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
+            const SizedBox(height: 12),
+            const Text(
+              'Seçtiğin kriterlere uygun kampanya bulamadık.\nFiltreleri sıfırlayarak tekrar denemeye ne dersin?',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF6B7280), fontSize: 14, height: 1.5),
+            ),
+            const SizedBox(height: 32),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  selectedCategory = 'Tümü';
+                  selectedCity = 'Tümü';
+                  selectedDistrict = 'Tümü';
+                });
+                _fetchCampaigns();
+              },
+              icon: const Icon(Icons.refresh, color: Color(0xFFFF7A00)),
+              label: const Text('Filtreleri Temizle', style: TextStyle(color: Color(0xFFFF7A00), fontWeight: FontWeight.bold, fontSize: 16)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFFF7A00), width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -145,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // ESKİ VE KULLANIŞLI DROPDOWN FİLTRELEME ÇUBUĞU
+          // FİLTRELEME ÇUBUĞU
           Container(
             color: Colors.white,
             padding: const EdgeInsets.all(12.0),
@@ -155,37 +244,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD 1
-                        decoration: const InputDecoration(
-                          labelText: 'Kategori',
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                          border: OutlineInputBorder(),
-                        ),
+                        isExpanded: true, 
+                        decoration: const InputDecoration(labelText: 'Kategori', contentPadding: EdgeInsets.symmetric(horizontal: 10), border: OutlineInputBorder()),
                         value: selectedCategory,
-                        items: categories.map((c) => DropdownMenuItem(
-                          value: c, 
-                          child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis) // ÜÇ NOKTA KOYAN KOD
-                        )).toList(),
-                        onChanged: (val) {
-                          setState(() => selectedCategory = val);
-                          _fetchCampaigns(); 
-                        },
+                        items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis))).toList(),
+                        onChanged: (val) { setState(() => selectedCategory = val); _fetchCampaigns(); },
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD 1
-                        decoration: const InputDecoration(
-                          labelText: 'Şehir',
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                          border: OutlineInputBorder(),
-                        ),
+                        isExpanded: true, 
+                        decoration: const InputDecoration(labelText: 'Şehir', contentPadding: EdgeInsets.symmetric(horizontal: 10), border: OutlineInputBorder()),
                         value: selectedCity,
-                        items: cities.map((c) => DropdownMenuItem(
-                          value: c, 
-                          child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis) // ÜÇ NOKTA KOYAN KOD
-                        )).toList(),
+                        items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis))).toList(),
                         onChanged: (val) {
                           setState(() {
                             selectedCity = val;
@@ -194,10 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             if (val == 'Tümü' || val == null) {
                               currentDistricts = ['Tümü'];
                             } else {
-                              List<String> dists = allDistrictsRaw
-                                  .where((item) => item['sehir_adi'].toString() == val)
-                                  .map((item) => item['ilce_adi'].toString())
-                                  .toList();
+                              List<String> dists = allDistrictsRaw.where((item) => item['sehir_adi'].toString() == val).map((item) => item['ilce_adi'].toString()).toList();
                               dists.sort();
                               currentDistricts = ['Tümü', ...dists];
                             }
@@ -208,47 +277,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                // İLÇE FİLTRESİ
                 if (selectedCity != null && selectedCity != 'Tümü')
                   Padding(
                     padding: const EdgeInsets.only(top: 12.0),
                     child: DropdownButtonFormField<String>(
-                      isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD
-                      decoration: const InputDecoration(
-                        labelText: 'İlçe',
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                        border: OutlineInputBorder(),
-                      ),
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'İlçe', contentPadding: EdgeInsets.symmetric(horizontal: 10), border: OutlineInputBorder()),
                       value: selectedDistrict,
-                      items: currentDistricts.map((c) => DropdownMenuItem(
-                        value: c, 
-                        child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)
-                      )).toList(),
-                      onChanged: (val) {
-                        setState(() => selectedDistrict = val);
-                        _fetchCampaigns(); 
-                      },
+                      items: currentDistricts.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis))).toList(),
+                      onChanged: (val) { setState(() => selectedDistrict = val); _fetchCampaigns(); },
                     ),
                   ),
               ],
             ),
           ),
 
-          // MODERN KAMPANYA LİSTESİ (KARTLAR)
+          // KAMPANYA LİSTESİ VEYA YÜKLEME / BOŞ EKRAN
           Expanded(
             child: isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF7A00)))
+                ? _buildShimmerLoading() // KENDİ YAPTIĞIMIZ ZENGİN YÜKLEME EKRANI
                 : campaigns.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.search_off_rounded, size: 64, color: Colors.grey.shade400),
-                            const SizedBox(height: 16),
-                            const Text('Bu kriterlere uygun kampanya bulunamadı 😔', style: TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.bold)),
-                          ],
-                        )
-                      )
+                    ? _buildEmptyState() // KENDİ YAPTIĞIMIZ ZENGİN BOŞ EKRAN
                     : ListView.builder(
                         padding: const EdgeInsets.only(left: 16, right: 16, top: 20, bottom: 100),
                         itemCount: campaigns.length,

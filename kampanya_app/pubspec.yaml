@@ -45,6 +45,7 @@ dependencies:
   mobile_scanner: ^7.2.0
   supabase_flutter: ^2.12.4
   flutter_secure_storage: ^10.2.0
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:
