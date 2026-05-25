@@ -50,7 +50,7 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
       setState(() {
         allDistrictsRaw = data;
         
-        // SÜPER ZEKİ DOKUNUŞ: Set kullanarak şehir isimlerini tekilleştiriyoruz (Aynı şehir defalarca eklenmesin diye)
+        // SÜPER ZEKİ DOKUNUŞ: Set kullanarak şehir isimlerini tekilleştiriyoruz
         Set<String> uniqueCities = data.map((item) => item['sehir_adi'].toString()).toSet();
         
         cities = uniqueCities.toList();
@@ -197,7 +197,7 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              // AKILLI İLÇE KUTUSU
+              // AKILLI İLÇE KUTUSU (Tek ve kusursuz hali)
               DropdownButtonFormField<String>(
                 isExpanded: true, // TAŞMAYI ÖNLEYEN SİHİRLİ KOD
                 decoration: const InputDecoration(labelText: 'İlçe', border: OutlineInputBorder()),
@@ -206,15 +206,6 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
                   value: d, 
                   child: Text(d, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)
                 )).toList(),
-                onChanged: (val) => setState(() => selectedDistrict = val),
-                disabledHint: const Text('Önce İl Seçiniz'),
-              ),
-              const SizedBox(height: 16),
-              // AKILLI İLÇE KUTUSU
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'İlçe', border: OutlineInputBorder()),
-                value: selectedDistrict,
-                items: currentDistricts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                 onChanged: (val) => setState(() => selectedDistrict = val),
                 disabledHint: const Text('Önce İl Seçiniz'),
               ),
