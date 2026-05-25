@@ -1,11 +1,10 @@
 import axios from 'axios';
 
-// Node.js backend'imizin adresi
 const api = axios.create({
-  baseURL: 'http://localhost:3000', 
+  baseURL: 'http://localhost:3000' // Backend'in çalıştığı port
 });
 
-// GÜVENLİK GÖREVLİSİ: Her istekten önce çalışır ve cebimizdeki bileti (Token) gösterir
+// BİLETİ OTOMATİK TAKMA AJANI (INTERCEPTOR)
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('adminToken');
   if (token) {

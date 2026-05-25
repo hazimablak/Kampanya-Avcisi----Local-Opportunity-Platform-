@@ -41,6 +41,8 @@ function App() {
       const res = await api.get('/api/users');
       setUsers(res.data);
     } catch (err) {
+      // Hatayı alert ile ekrana basalım ki sorunun kaynağını direkt görelim
+      alert('Esnaflar çekilirken hata oluştu: ' + (err.response?.data?.error || err.message));
       console.error('Kullanıcılar çekilemedi', err);
     }
   };
