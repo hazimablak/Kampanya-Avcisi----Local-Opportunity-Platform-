@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 import 'package:dio/dio.dart';
 import 'home_screen.dart';
-import 'package:kampanya_app/services/api_client.dart'; // Ajanı çağırdık
+import 'package:kampanya_app/services/api_client.dart';
 
 class AddCampaignScreen extends StatefulWidget {
   const AddCampaignScreen({Key? key}) : super(key: key);
@@ -19,16 +20,47 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
   // Text Controller'lar
   final titleController = TextEditingController();
   final descriptionController = TextEditingController();
-  final districtController = TextEditingController();
   final addressController = TextEditingController();
 
   // Dropdown ve Tarih Değişkenleri
   String? selectedCategory;
   String? selectedCity;
+  String? selectedDistrict; 
   DateTime? selectedDate;
 
   final List<String> categories = ['Kahveci', 'Yemek', 'Hizmet', 'Giyim', 'Market'];
-  final List<String> cities = ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Siirt'];
+  
+  // YENİ FLAT JSON YAPISI İÇİN DEĞİŞKENLER
+  List<dynamic> allDistrictsRaw = []; // Tüm JSON verisi buraya dolacak
+  List<String> cities = [];           // Tekilleştirilmiş şehir isimleri
+  List<String> currentDistricts = []; // Seçilen şehre ait ilçeler
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCityData(); 
+  }
+
+  // FLAT JSON OKUMA VE ŞEHİRLERİ AYIKLAMA ZEKASI
+  Future<void> _loadCityData() async {
+    try {
+      final String response = await rootBundle.loadString('assets/ilceler.json');
+      final List<dynamic> data = json.decode(response);
+      
+      setState(() {
+        allDistrictsRaw = data;
+        
+        // SÜPER ZEKİ DOKUNUŞ: Set kullanarak şehir isimlerini tekilleştiriyoruz (Aynı şehir defalarca eklenmesin diye)
+        Set<String> uniqueCities = data.map((item) => item['sehir_adi'].toString()).toSet();
+        
+        cities = uniqueCities.toList();
+        cities.sort(); // Şehirleri alfabetik sıraya diz
+      });
+    } catch (e) {
+      debugPrint("JSON Yükleme Hatası: $e");
+      Get.snackbar('Hata', 'İlçe verisi okunamadı: $e', backgroundColor: Colors.redAccent, colorText: Colors.white);
+    }
+  }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -52,18 +84,15 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
     if (picked != null) setState(() => selectedDate = picked);
   }
 
-  // GÜVENLİ KAYIT FONKSİYONU
   void _submitCampaign() async {
-    if (!_formKey.currentState!.validate() || selectedCategory == null || selectedCity == null || selectedDate == null) {
-      Get.snackbar('Eksik Bilgi', 'Lütfen tüm alanları doldurun.', backgroundColor: Colors.redAccent, colorText: Colors.white);
+    if (!_formKey.currentState!.validate() || selectedCategory == null || selectedCity == null || selectedDistrict == null || selectedDate == null) {
+      Get.snackbar('Eksik Bilgi', 'Lütfen tüm alanları (İlçe dahil) doldurun.', backgroundColor: Colors.redAccent, colorText: Colors.white);
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
-      // DİKKAT: Manuel Dio ve Token okuma bitti! 
-      // Ajan (ApiClient.dio) bileti otomatik olarak kasadan alıp başlığa takacak.
       final response = await ApiClient.dio.post(
         '/api/campaigns',
         data: {
@@ -71,7 +100,7 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
           'description': descriptionController.text,
           'category': selectedCategory,
           'city': selectedCity,
-          'district': districtController.text,
+          'district': selectedDistrict, 
           'address': addressController.text,
           'end_date': selectedDate!.toIso8601String(),
         },
@@ -79,10 +108,9 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
 
       if (response.statusCode == 200) {
         Get.snackbar('Başarılı!', 'Kampanyanız yayına alındı 🚀', backgroundColor: Colors.green, colorText: Colors.white);
-        Get.offAll(() => const HomeScreen()); // Listeyi yenilemek için Home'a dön
+        Get.offAll(() => const HomeScreen()); 
       }
     } on DioException catch (e) {
-      // Ajan hatayı yakaladıysa detayını gösterelim
       String errMsg = e.response?.data?['error'] ?? 'Kampanya eklenemedi!';
       Get.snackbar('Hata', errMsg, backgroundColor: Colors.redAccent, colorText: Colors.white);
     } catch (e) {
@@ -97,10 +125,9 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        // KENDİ ELLERİMİZLE GERİ TUŞU EKLİYORUZ
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Get.offAll(() => const HomeScreen()), // Geri tuşu Home'a döndürür
+          onPressed: () => Get.offAll(() => const HomeScreen()), 
         ),
         title: const Text('Yeni Kampanya Oluştur', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFFFF7A00),
@@ -127,6 +154,7 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
+                  // KATEGORİ
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       decoration: const InputDecoration(labelText: 'Kategori', border: OutlineInputBorder()),
@@ -136,21 +164,42 @@ class _AddCampaignScreenState extends State<AddCampaignScreen> {
                     ),
                   ),
                   const SizedBox(width: 16),
+                  // DİNAMİK İL SEÇİM KUTUSU
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: 'Şehir', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(labelText: 'İl', border: OutlineInputBorder()),
                       value: selectedCity,
-                      items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
-                      onChanged: (val) => setState(() => selectedCity = val),
+                      items: cities.map((c) => DropdownMenuItem(
+                        value: c, 
+                        child: Text(c, style: const TextStyle(fontSize: 14))
+                      )).toList(),
+                      onChanged: (val) {
+                        if (val == null) return;
+                        setState(() {
+                          selectedCity = val;
+                          selectedDistrict = null; // İl değişince ilçeyi sıfırla!
+                          
+                          // SİHİRLİ FİLTRELEME: Büyük listeden sadece sehir_adi seçilen il olanları süzüyoruz
+                          currentDistricts = allDistrictsRaw
+                              .where((item) => item['sehir_adi'].toString() == val)
+                              .map((item) => item['ilce_adi'].toString())
+                              .toList();
+                          
+                          currentDistricts.sort(); // İlçeleri de kendi içinde alfabetik sırala
+                        });
+                      },
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: districtController,
+              // AKILLI İLÇE KUTUSU
+              DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'İlçe', border: OutlineInputBorder()),
-                validator: (val) => val!.isEmpty ? 'İlçe zorunludur' : null,
+                value: selectedDistrict,
+                items: currentDistricts.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                onChanged: (val) => setState(() => selectedDistrict = val),
+                disabledHint: const Text('Önce İl Seçiniz'),
               ),
               const SizedBox(height: 16),
               TextFormField(

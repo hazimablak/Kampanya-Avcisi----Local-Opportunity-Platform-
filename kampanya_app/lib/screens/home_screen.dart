@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:dio/dio.dart'; // İŞTE EKSİK OLAN HAYAT KURTARICI KOD BURADA!
+import 'package:dio/dio.dart'; 
 import 'package:kampanya_app/services/api_client.dart';
 import 'package:kampanya_app/config.dart';
 import 'login_screen.dart';
@@ -25,19 +27,45 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isLoading = true;
 
   // Filtre Değişkenleri
-  String? selectedCity;
-  String? selectedCategory;
+  String? selectedCity = 'Tümü';
+  String? selectedDistrict = 'Tümü';
+  String? selectedCategory = 'Tümü';
 
-  // Örnek Kategori ve Şehir Listeleri
   final List<String> categories = ['Tümü', 'Kahveci', 'Yemek', 'Hizmet', 'Giyim', 'Market'];
-  final List<String> cities = ['Tümü', 'İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Siirt']; // Siirt'i buraya da ekledim :)
+  
+  // JSON'dan Dolacak Filtre Listeleri
+  List<dynamic> allDistrictsRaw = []; 
+  List<String> cities = ['Tümü']; 
+  List<String> currentDistricts = ['Tümü']; 
 
   @override
   void initState() {
     super.initState();
     isMerchant = storage.read('isMerchant') ?? false;
     userName = storage.read('userName') ?? 'Misafir';
+    _loadCityData(); // JSON verilerini yükle
     _fetchCampaigns();
+  }
+
+  // FLAT JSON OKUMA VE ŞEHİRLERİ AYIKLAMA (Filtreleme İçin)
+  Future<void> _loadCityData() async {
+    try {
+      final String response = await rootBundle.loadString('assets/ilceler.json');
+      final List<dynamic> data = json.decode(response);
+      
+      setState(() {
+        allDistrictsRaw = data;
+        
+        // Şehirleri tekilleştir ve sırala
+        Set<String> uniqueCities = data.map((item) => item['sehir_adi'].toString()).toSet();
+        List<String> sortedCities = uniqueCities.toList()..sort();
+        
+        // 'Tümü' seçeneğini en başa ekleyerek listeyi güncelle
+        cities = ['Tümü', ...sortedCities];
+      });
+    } catch (e) {
+      debugPrint("JSON Yükleme Hatası: $e");
+    }
   }
 
   Future<void> _fetchCampaigns() async {
@@ -45,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       Map<String, dynamic> queryParams = {};
       if (selectedCity != null && selectedCity != 'Tümü') queryParams['city'] = selectedCity;
+      if (selectedDistrict != null && selectedDistrict != 'Tümü') queryParams['district'] = selectedDistrict;
       if (selectedCategory != null && selectedCategory != 'Tümü') queryParams['category'] = selectedCategory;
 
       final response = await ApiClient.dio.get(
@@ -58,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      print("KAMPANYA ÇEKME HATASI: $e");
+      debugPrint("KAMPANYA ÇEKME HATASI: $e");
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -77,14 +106,12 @@ class _HomeScreenState extends State<HomeScreen> {
       onConfirm: () async {
         Get.back(); // Dialogu kapat
         try {
-          // Ajanı (ApiClient) göreve yolla
           final response = await ApiClient.dio.delete('/api/campaigns/$campaignId');
           if (response.statusCode == 200) {
             Get.snackbar('Başarılı', 'Kampanya silindi.', backgroundColor: Colors.green, colorText: Colors.white);
             _fetchCampaigns(); // Listeyi güncelle
           }
         } on DioException catch (e) {
-          // EĞER BAŞKASININ KAMPANYASINI SİLMEYE ÇALIŞIRSA BACKEND BURAYA HATA FIRLATIR!
           String errMsg = e.response?.data?['message'] ?? 'Silinemedi.';
           Get.snackbar('Güvenlik Duvarı 🛡️', errMsg, backgroundColor: Colors.redAccent, colorText: Colors.white);
         }
@@ -97,6 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await secureStorage.deleteAll();
     storage.write('isMerchant', false);
     storage.remove('merchantPhone');
+    storage.remove('isAdmin'); // Admin yetkisini de hafızadan temizle
     Get.offAll(() => const LoginScreen());
     
     Get.snackbar('Çıkış Başarılı', 'Güvenli bir şekilde çıkış yaptınız.', 
@@ -132,43 +160,80 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // FİLTRELEME ÇUBUĞU
+          // GELİŞMİŞ FİLTRELEME ÇUBUĞU (Kategori, Şehir, İlçe)
           Container(
             color: Colors.white,
             padding: const EdgeInsets.all(12.0),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Şehir Seç',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                      border: OutlineInputBorder(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(
+                          labelText: 'Kategori',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                          border: OutlineInputBorder(),
+                        ),
+                        value: selectedCategory,
+                        items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
+                        onChanged: (val) {
+                          setState(() => selectedCategory = val);
+                          _fetchCampaigns(); 
+                        },
+                      ),
                     ),
-                    value: selectedCity,
-                    items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (val) {
-                      setState(() => selectedCity = val);
-                      _fetchCampaigns(); 
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Kategori Seç',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                      border: OutlineInputBorder(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(
+                          labelText: 'Şehir',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                          border: OutlineInputBorder(),
+                        ),
+                        value: selectedCity,
+                        items: cities.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            selectedCity = val;
+                            selectedDistrict = 'Tümü'; // Şehir değiştiğinde ilçeyi sıfırla
+                            
+                            if (val == 'Tümü' || val == null) {
+                              currentDistricts = ['Tümü'];
+                            } else {
+                              // JSON'dan sadece o şehrin ilçelerini bul
+                              List<String> dists = allDistrictsRaw
+                                  .where((item) => item['sehir_adi'].toString() == val)
+                                  .map((item) => item['ilce_adi'].toString())
+                                  .toList();
+                              dists.sort();
+                              currentDistricts = ['Tümü', ...dists];
+                            }
+                            _fetchCampaigns(); 
+                          });
+                        },
+                      ),
                     ),
-                    value: selectedCategory,
-                    items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (val) {
-                      setState(() => selectedCategory = val);
-                      _fetchCampaigns(); 
-                    },
-                  ),
+                  ],
                 ),
+                // İLÇE FİLTRESİ SADECE ŞEHİR SEÇİLİNCE GÖRÜNSÜN
+                if (selectedCity != null && selectedCity != 'Tümü')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12.0),
+                    child: DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'İlçe',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                        border: OutlineInputBorder(),
+                      ),
+                      value: selectedDistrict,
+                      items: currentDistricts.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
+                      onChanged: (val) {
+                        setState(() => selectedDistrict = val);
+                        _fetchCampaigns(); 
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
@@ -185,10 +250,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (context, index) {
                           final camp = campaigns[index];
                           
-                          // KİMLİK KONTROLLERİNİ BURAYA (ARAYÜZ ÇİZİLMEDEN ÖNCEYE) ALDIK!
+                          // GÜVENLİK GÜNCELLEMESİ: ADMİN YETKİSİ TAMAMEN KALDIRILDI!
                           String myPhone = storage.read('merchantPhone') ?? '';
-                          bool isAdmin = storage.read('isAdmin') ?? false; 
-                          bool isMyCampaign = camp['merchant_phone'] == myPhone;
+                          
+                          // Çöp kutusunu SADECE kampanya, sisteme giren esnafa aitse göster (Misafir kesinlikle göremez)
+                          bool isMyCampaign = isMerchant && myPhone.isNotEmpty && camp['merchant_phone'] == myPhone;
 
                           return Card(
                             elevation: 4,
@@ -221,8 +287,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                         ),
                                       ),
-                                      // SADECE ADMİN VEYA KAMPANYA SAHİBİ ÇÖP KUTUSUNU GÖRÜR
-                                      if (isAdmin || isMyCampaign)
+                                      // SİL BUTONU ARTIK SADECE "isMyCampaign" TRUE İSE GÖRÜNÜR
+                                      if (isMyCampaign)
                                         IconButton(
                                           icon: const Icon(Icons.delete, color: Colors.redAccent),
                                           onPressed: () => _deleteCampaign(camp['id']),
@@ -253,11 +319,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       
-      // ESNAF İÇİN "KAMPANYA EKLE" BUTONU
       floatingActionButton: isMerchant
           ? FloatingActionButton.extended(
               onPressed: () {
-                // Get.offAll YERİNE Get.to KULLANIYORUZ Kİ GERİ TUŞU ÇALIŞSIN!
                 Get.to(() => const AddCampaignScreen()); 
               },
               backgroundColor: const Color(0xFFFF7A00),

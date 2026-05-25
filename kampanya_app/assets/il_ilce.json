@@ -1,0 +1,6 @@
+{
+  "İstanbul": ["Kadıköy", "Beşiktaş", "Üsküdar", "Maltepe"],
+  "Ankara": ["Çankaya", "Keçiören", "Yenimahalle", "Mamak"],
+  "Siirt": ["Merkez", "Kurtalan", "Baykan", "Pervari", "Eruh", "Şirvan", "Tillo"],
+  "Bursa": ["Nilüfer", "Osmangazi", "Yıldırım"]
+}
