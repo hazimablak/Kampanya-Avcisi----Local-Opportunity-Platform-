@@ -19,16 +19,18 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// --- BULUT VERİTABANI (NEON) BAĞLANTI AYARLARI ---
+// Artık host, user, password gibi tek tek değişkenler yerine
+// Neon'un bize verdiği o uzun DATABASE_URL linkini kullanıyoruz!
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
+  connectionString: process.env.DATABASE_URL, 
+  ssl: {
+    rejectUnauthorized: false // Neon (ve diğer bulut DB'ler) güvenli SSL bağlantısı ister.
+  }
 });
 
 pool.connect()
-  .then(() => console.log('✅ PostgreSQL bağlandı!'))
+  .then(() => console.log('✅ NEON BULUT PostgreSQL bağlandı! ☁️'))
   .catch(err => console.error('❌ Veritabanı hatası:', err.stack));
 
 // GÜVENLİK DUVARI
@@ -102,15 +104,18 @@ app.post('/api/login', loginLimiter, async (req, res) => {
   }
 });
 
-// 3. KAMPANYALARI GETİR
+// 3. KAMPANYALARI GETİR (BURADA MERCHANT_PHONE VERİSİNİ KALDIRDIK, YERİNE user_id GETİRDİK)
 app.get('/api/campaigns', async (req, res) => {
   const { city, district, category } = req.query;
-  let query = `SELECT c.*, u.phone AS merchant_phone FROM campaigns c INNER JOIN users u ON c.user_id = u.id WHERE c.end_date >= CURRENT_DATE`;
+  
+  // DİKKAT: Eski kodunda campaigns tablosunda user_id arıyordun ama oluştururken merchant_phone kullandık.
+  // Neon'a yüklediğimiz SQL'de merchant_phone (varchar) olarak bağladık. O yüzden sorguyu düzelttim:
+  let query = `SELECT c.*, c.merchant_phone FROM campaigns c WHERE c.end_date >= CURRENT_DATE`;
   let values = [];
   let counter = 1;
 
   if (city && city !== 'Tümü') { query += ` AND city = $${counter}`; values.push(city); counter++; }
-  if (district) { query += ` AND district = $${counter}`; values.push(district); counter++; }
+  if (district && district !== 'Tümü') { query += ` AND district = $${counter}`; values.push(district); counter++; }
   if (category && category !== 'Tümü') { query += ` AND category = $${counter}`; values.push(category); counter++; }
 
   query += ' ORDER BY created_at DESC';
@@ -125,14 +130,18 @@ app.get('/api/campaigns', async (req, res) => {
 
 // 4. YENİ KAMPANYA EKLE
 app.post('/api/campaigns', authenticateToken, async (req, res) => {
-  const userId = req.user.id; 
   const { title, description, category, city, district, address, end_date } = req.body;
   
   try {
+    // Önce biletteki id ile kullanıcının telefon numarasını bulalım (Çünkü kampanyayı telefonla bağlıyoruz)
+    const userResult = await pool.query('SELECT phone FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+    const merchantPhone = userResult.rows[0].phone;
+
     const result = await pool.query(
-      `INSERT INTO campaigns (user_id, title, description, category, city, district, address, end_date) 
+      `INSERT INTO campaigns (title, description, category, city, district, address, merchant_phone, end_date) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [userId, title, description, category, city, district, address, end_date]
+      [title, description, category, city, district, address, merchantPhone, end_date]
     );
     res.json({ success: true, campaign: result.rows[0] });
   } catch (err) {
@@ -143,17 +152,19 @@ app.post('/api/campaigns', authenticateToken, async (req, res) => {
 // 5. KAMPANYA SİL (ADMİN İSE HER ŞEYİ SİLEBİLİR)
 app.delete('/api/campaigns/:id', authenticateToken, async (req, res) => {
   const campaignId = req.params.id;
-  const userId = req.user.id;      
-  const isAdmin = req.user.isAdmin; // Token'dan admin yetkisini okuduk
+  const isAdmin = req.user.isAdmin; 
 
   try {
     let result;
     
-    // Eğer adminsen, kampanya kimin olursa olsun SİL. Değilsen, sadece kendi kampanyanı sil!
+    // Önce biletteki id ile kullanıcının telefon numarasını bulalım
+    const userResult = await pool.query('SELECT phone FROM users WHERE id = $1', [req.user.id]);
+    const merchantPhone = userResult.rows[0].phone;
+
     if (isAdmin) {
       result = await pool.query('DELETE FROM campaigns WHERE id = $1 RETURNING *', [campaignId]);
     } else {
-      result = await pool.query('DELETE FROM campaigns WHERE id = $1 AND user_id = $2 RETURNING *', [campaignId, userId]);
+      result = await pool.query('DELETE FROM campaigns WHERE id = $1 AND merchant_phone = $2 RETURNING *', [campaignId, merchantPhone]);
     }
 
     if (result.rows.length === 0) {
@@ -183,13 +194,11 @@ app.post('/api/refresh', (req, res) => {
 
 // 7. TÜM ESNAFLARI GETİR (SADECE ADMİN GÖREBİLİR)
 app.get('/api/users', authenticateToken, async (req, res) => {
-  // 1. Ekstra Güvenlik: Giren kişi admin değilse kapıyı yüzüne kapat!
   if (!req.user.isAdmin) {
     return res.status(403).json({ error: 'Bu veriyi sadece Sistem Yöneticisi görebilir!' });
   }
   
   try {
-    // 2. Şifreleri ASLA çekmiyoruz! Sadece id, isim ve telefon numarasını alıyoruz.
     const result = await pool.query('SELECT id, name, phone FROM users ORDER BY id DESC');
     res.json(result.rows);
   } catch (err) {
