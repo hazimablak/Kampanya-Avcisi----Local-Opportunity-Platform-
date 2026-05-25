@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000' // Backend'in çalıştığı port
+  baseURL: 'https://kampanya-avcisi-api.onrender.com' // Backend'in çalıştığı port
 });
 
 // BİLETİ OTOMATİK TAKMA AJANI (INTERCEPTOR)
